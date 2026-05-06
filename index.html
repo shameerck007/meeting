@@ -532,120 +532,464 @@ function updateCounters(){
 function exportPDF(){
   const m=getMtg();if(!m){showToast('No meeting selected','info');return;}
   const {jsPDF}=window.jspdf;
-  const doc=new jsPDF({unit:'mm',format:'a4'});
-  const W=210,H=297,ml=20,mr=20,cw=W-ml-mr;
-  const WHITE=[255,255,255],SURF2=[249,248,245],SURF3=[240,239,233],BORDER=[226,224,216],BORDER2=[204,201,190];
-  const BLUE=[26,86,219],BLU_L=[239,244,255],BLU_B=[190,211,251];
-  const GREEN=[26,122,74],GRN_L=[240,250,244],GRN_B=[182,230,206];
-  const AMBER=[154,95,10],AMB_L=[255,251,235],AMB_B=[252,216,136];
-  const RED=[197,41,26],RED_L=[254,242,241],RED_B=[245,184,178];
-  const TEXT=[26,25,22],TEXT2=[90,87,80],TEXT3=[155,152,144];
-  const fc=rgb=>doc.setFillColor(...rgb);
-  const tc=rgb=>doc.setTextColor(...rgb);
-  const dc=rgb=>doc.setDrawColor(...rgb);
-  let y=0;
+  const doc=new jsPDF({unit:'mm',format:'a4',compress:true});
 
-  fc(WHITE);doc.rect(0,0,W,H,'F');
-  fc(BLUE);doc.rect(0,0,W,3,'F');
-  fc(SURF3);doc.rect(0,0,W,70,'F');
-  fc(BORDER);doc.rect(0,70,W,0.4,'F');
-  fc(BLUE);doc.roundedRect(ml,14,10,10,2,2,'F');
-  tc(WHITE);doc.setFont('helvetica','bold');doc.setFontSize(8);doc.text('M',ml+5,21.5,{align:'center'});
-  tc(BLUE);doc.setFontSize(11);doc.text('Minutes',ml+14,21.5);
-  y=38;
-  if(m.company){tc(BLUE);doc.setFont('helvetica','bold');doc.setFontSize(7.5);doc.setCharSpace(2.5);doc.text(m.company.toUpperCase(),ml,y);doc.setCharSpace(0);y+=8;}
-  tc(TEXT);doc.setFont('helvetica','bold');doc.setFontSize(22);
-  doc.splitTextToSize(m.title||'Meeting Notes',cw).slice(0,2).forEach(l=>{doc.text(l,ml,y);y+=9.5;});
-  const meta=[];if(m.date)meta.push(m.date);if(m.time)meta.push(m.time);if(m.location)meta.push(m.location);
-  if(meta.length){tc(TEXT3);doc.setFont('helvetica','normal');doc.setFontSize(9);doc.text(meta.join('  ·  '),ml,y+2);}
-  y=80;
-  const stats=[{v:(m.attendees||[]).length,l:'Participants',c:BLUE,cb:BLU_L,cbr:BLU_B},{v:(m.agenda||[]).length,l:'Agenda Items',c:AMBER,cb:AMB_L,cbr:AMB_B},{v:(m.actionItems||[]).length,l:'Action Items',c:GREEN,cb:GRN_L,cbr:GRN_B},{v:(m.actionItems||[]).filter(a=>a.status!=='Done').length,l:'Open Actions',c:RED,cb:RED_L,cbr:RED_B}];
-  const sw=(cw-9)/4;
-  stats.forEach((s,i)=>{const sx=ml+i*(sw+3);fc(s.cb);doc.roundedRect(sx,y,sw,20,2,2,'F');dc(s.cbr);doc.setLineWidth(0.4);doc.roundedRect(sx,y,sw,20,2,2,'S');fc(s.c);doc.rect(sx,y,sw,1.5,'F');tc(s.c);doc.setFont('helvetica','bold');doc.setFontSize(16);doc.text(String(s.v),sx+sw/2,y+14,{align:'center'});tc(TEXT3);doc.setFont('helvetica','normal');doc.setFontSize(6.5);doc.text(s.l,sx+sw/2,y+19,{align:'center'});});
-  y+=28;
-  if((m.attendees||[]).length){
-    tc(TEXT3);doc.setFont('helvetica','bold');doc.setFontSize(7);doc.setCharSpace(1.8);doc.text('PARTICIPANTS',ml,y);doc.setCharSpace(0);y+=7;
-    m.attendees.forEach((a,i)=>{const col=i%3,row=Math.floor(i/3),ax=ml+col*(cw/3),ay=y+row*7;fc(BLU_L);doc.circle(ax+2,ay-2.5,2,'F');tc(BLUE);doc.setFont('helvetica','bold');doc.setFontSize(6.5);doc.text((a[0]||'').toUpperCase(),ax+2,ay-0.5,{align:'center'});tc(TEXT);doc.setFont('helvetica','normal');doc.setFontSize(9.5);doc.text(a,ax+7,ay);});
-    y+=Math.ceil(m.attendees.length/3)*7+8;
+  // ══════════════════════════════════════════════
+  // PALETTE  — Professional teal-slate theme
+  // ══════════════════════════════════════════════
+  const W=210,H=297,ML=22,MR=18,CW=W-ML-MR;
+
+  // Primary (deep teal-blue)
+  const PRI    =[22,88,110];    // deep teal
+  const PRI_MD =[44,130,158];   // medium teal
+  const PRI_LT =[229,245,250];  // pale teal tint
+  const PRI_XL =[245,251,253];  // barely-there tint
+
+  // Accent warm (for section bars)
+  const ACC    =[38,70,120];    // deep navy for section titles
+  const ACC_LT =[235,241,252];
+
+  // Neutrals
+  const WH     =[255,255,255];
+  const BG_ROW =[247,250,252];
+  const RULE   =[210,222,228];
+  const BRD    =[182,202,210];
+  const TXT    =[22,34,50];     // near-black
+  const TXT2   =[72,90,108];    // slate
+  const TXT3   =[138,158,172];  // light slate
+
+  // Status palette
+  const G_TXT=[20,110,65]; const G_BG=[232,251,242]; const G_BR=[170,225,196];
+  const A_TXT=[148,90,12];  const A_BG=[254,248,228]; const A_BR=[230,192,110];
+  const B_TXT=[25,80,175];  const B_BG=[232,241,255]; const B_BR=[168,196,240];
+  const R_TXT=[178,35,28];  const R_BG=[254,238,236]; const R_BR=[235,170,165];
+
+  // ── Drawing helpers ──
+  const fc=(...c)=>doc.setFillColor(...(c.length===1?c[0]:c));
+  const tc=(...c)=>doc.setTextColor(...(c.length===1?c[0]:c));
+  const dc=(...c)=>doc.setDrawColor(...(c.length===1?c[0]:c));
+  const lw=w=>doc.setLineWidth(w);
+  const bf=(sty,sz)=>{doc.setFont('helvetica',sty);doc.setFontSize(sz);}
+  const hline=(yy,x1,x2,w,col)=>{dc(...(col||RULE));lw(w||0.25);doc.line(x1,yy,x2,yy);}
+  const rect=(x,y,w,h,col)=>{fc(...col);doc.rect(x,y,w,h,'F');}
+  const wrap=(txt,maxW)=>doc.splitTextToSize(txt||'',maxW);
+
+  let pageNum=0;
+
+  // ── Running header (content pages) ──
+  function drawHeader(){
+    // Colored strip
+    rect(0,0,W,12,PRI);
+    // Thin accent stripe at very top
+    rect(0,0,W,2.5,PRI_MD);
+    tc(...WH);bf('bold',7.5);
+    const hLabel=((m.company?m.company+'  ·  ':'')+( m.title||'Meeting Minutes')).slice(0,70);
+    doc.text(hLabel,ML,8);
+    bf('normal',7);
+    doc.text('MEETING MINUTES',W-MR,8,{align:'right'});
   }
-  fc(SURF3);doc.rect(0,H-14,W,14,'F');fc(BORDER);doc.rect(0,H-14,W,0.3,'F');
-  tc(TEXT3);doc.setFontSize(7.5);doc.setFont('helvetica','normal');doc.text('Generated '+new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}),W/2,H-5,{align:'center'});
+
+  // ── Page footer ──
+  function drawFooter(pg){
+    const tot=doc.internal.getNumberOfPages();
+    rect(0,H-13,W,13,PRI_XL);
+    hline(H-13,0,W,0.3,BRD);
+    tc(...TXT3);bf('normal',7);
+    doc.text(m.company||'',ML,H-7.5);
+    tc(...TXT2);bf('normal',7);
+    doc.text('CONFIDENTIAL  —  For Internal Use Only',W/2,H-7.5,{align:'center'});
+    tc(...TXT3);bf('normal',7);
+    doc.text('Page '+pg+' of '+tot,W-MR,H-7.5,{align:'right'});
+    tc(...TXT3);bf('normal',6.5);
+    doc.text(m.date?'Meeting: '+fmtDate(m.date):'',ML,H-3.5);
+    doc.text('Generated '+new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),W-MR,H-3.5,{align:'right'});
+  }
 
   function newPage(){
-    doc.addPage();fc(WHITE);doc.rect(0,0,W,H,'F');fc(BLUE);doc.rect(0,0,W,1.5,'F');fc(SURF3);doc.rect(0,0,W,11,'F');fc(BORDER);doc.rect(0,11,W,0.3,'F');
-    tc(TEXT3);doc.setFont('helvetica','bold');doc.setFontSize(6);doc.setCharSpace(1.5);doc.text(((m.company?m.company+' · ':'')+( m.title||'')).toUpperCase().slice(0,55),ml,7.5);doc.setCharSpace(0);
-    tc(TEXT3);doc.setFont('helvetica','normal');doc.setFontSize(6.5);doc.text(String(doc.internal.getCurrentPageInfo().pageNumber),W-mr,7.5,{align:'right'});
-    fc(SURF3);doc.rect(0,H-10,W,10,'F');fc(BORDER);doc.rect(0,H-10,W,0.3,'F');tc(TEXT3);doc.setFontSize(7);doc.text(m.date||'',W/2,H-3.5,{align:'center'});
+    doc.addPage();pageNum++;
+    rect(0,0,W,H,WH);
+    drawHeader();
+    drawFooter(pageNum);
     return 18;
   }
-  function secHead(title,color,light,lborder){
-    if(y>H-50)y=newPage();y+=6;
-    fc(light);doc.roundedRect(ml,y,cw,11,2,2,'F');dc(lborder);doc.setLineWidth(0.3);doc.roundedRect(ml,y,cw,11,2,2,'S');
-    fc(color);doc.roundedRect(ml,y,3,11,1,1,'F');
-    tc(color);doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setCharSpace(1.5);doc.text(title.toUpperCase(),ml+8,y+7.5);doc.setCharSpace(0);y+=17;
+
+  function chk(need,yy){
+    if(yy+need>H-18){yy=newPage();}
+    return yy;
   }
-  function chk(need){if(y+need>H-16)y=newPage();}
+
+  // ── Section heading: left colored bar + styled title ──
+  function secHead(num,title,yy){
+    yy=chk(18,yy)+4;
+    // Colored left bar
+    rect(ML,yy-1,3.5,9,PRI);
+    // Light tint background
+    rect(ML+3.5,yy-1,CW-3.5,9,PRI_LT);
+    // Section number (teal)
+    tc(...PRI_MD);bf('bold',7.5);doc.setCharSpace(0.5);
+    doc.text(num,ML+6,yy+5.5);
+    // Section title
+    tc(...ACC);bf('bold',9);doc.setCharSpace(1.4);
+    doc.text(title.toUpperCase(),ML+16,yy+5.5);
+    doc.setCharSpace(0);
+    return yy+14;
+  }
+
+  // ── Pill/badge helper ──
+  function badge(txt,x,y,txC,bgC,brC){
+    const tw=doc.getStringUnitWidth(txt)*7/doc.internal.scaleFactor;
+    const bw=tw+8,bh=6.5,bx=x,by=y-4.5;
+    fc(...bgC);doc.rect(bx,by,bw,bh,'F');
+    dc(...brC);lw(0.25);doc.rect(bx,by,bw,bh,'S');
+    tc(...txC);bf('bold',6.5);
+    doc.text(txt,bx+bw/2,by+4.3,{align:'center'});
+  }
+
+  // ════════════════════════════════════════════
+  //  PAGE 1 — COVER
+  // ════════════════════════════════════════════
+  pageNum=1;
+  rect(0,0,W,H,WH);
+
+  // ── Header banner ──
+  rect(0,0,W,48,PRI);
+  rect(0,0,W,4,PRI_MD);          // thick accent stripe on top
+  hline(48,0,W,0.5,PRI_MD);
+
+  // Company name
+  let cy=16;
+  if(m.company){
+    tc(...WH);bf('bold',14);doc.setCharSpace(2);
+    doc.text(m.company.toUpperCase(),ML,cy);
+    doc.setCharSpace(0);
+    tc(180,220,232);bf('normal',8);doc.setCharSpace(1.5);
+    doc.text('MEETING MINUTES',W-MR,cy,{align:'right'});
+    doc.setCharSpace(0);
+  } else {
+    tc(...WH);bf('bold',14);doc.setCharSpace(2);
+    doc.text('MEETING MINUTES',ML,cy);
+    doc.setCharSpace(0);
+  }
+
+  // Date in banner (right side, below)
+  if(m.date){
+    tc(180,220,232);bf('normal',8);
+    doc.text(fmtDate(m.date),W-MR,cy+9,{align:'right'});
+  }
+
+  // ── Meeting title (below banner) ──
+  let y=60;
+  tc(...TXT);bf('bold',24);
+  const tLines=wrap(m.title||'Meeting Minutes',CW);
+  tLines.slice(0,3).forEach(l=>{doc.text(l,ML,y);y+=12;});
+
+  // Colored rule under title
+  y+=2;
+  rect(ML,y,CW,1.2,PRI);
+  rect(ML,y+1.2,CW*0.35,0.8,PRI_MD);
+  y+=8;
+
+  // ── Meeting details row ──
+  const DET=[
+    {ico:'📅',lbl:'DATE',val:m.date?fmtDate(m.date):'—'},
+    {ico:'🕐',lbl:'TIME',val:m.time||'—'},
+    {ico:'📍',lbl:'LOCATION',val:m.location||'—'},
+  ];
+  const dw=CW/3;
+  DET.forEach((d,i)=>{
+    const dx=ML+i*dw;
+    // Light card bg
+    rect(dx+(i>0?2:0),y,dw-(i>0?4:2),24,PRI_XL);
+    if(i>0){dc(...BRD);lw(0.3);doc.line(dx+2,y+3,dx+2,y+21);}
+    tc(...PRI_MD);bf('bold',6.5);doc.setCharSpace(1);
+    doc.text(d.lbl,dx+(i>0?6:4),y+8);
+    doc.setCharSpace(0);
+    tc(...TXT);bf('bold',9.5);
+    const vLines=wrap(d.val,dw-8);
+    doc.text(vLines[0]||'—',dx+(i>0?6:4),y+17);
+  });
+  y+=30;
+
+  // ── Reference info ──
+  const ref='MOM-'+new Date().toISOString().slice(0,10).replace(/-/g,'');
+  tc(...TXT3);bf('normal',7.5);
+  doc.text('Document Ref: '+ref,ML,y);
+  doc.text('Prepared: '+new Date().toLocaleDateString('en-US',{day:'2-digit',month:'long',year:'numeric'}),W-MR,y,{align:'right'});
+  y+=10;
+
+  // ── Attendees ──
+  if((m.attendees||[]).length){
+    hline(y,ML,W-MR,0.3,BRD);y+=6;
+    // Label bar
+    rect(ML,y,CW,8,PRI_LT);
+    rect(ML,y,3,8,PRI);
+    tc(...ACC);bf('bold',7.5);doc.setCharSpace(1.2);
+    doc.text('IN ATTENDANCE',ML+7,y+5.5);doc.setCharSpace(0);
+    tc(...TXT3);bf('normal',7);
+    doc.text(m.attendees.length+' participant'+(m.attendees.length!==1?'s':''),W-MR,y+5.5,{align:'right'});
+    y+=13;
+
+    const aCols=m.attendees.length>6?3:2;
+    const aColW=CW/aCols;
+    m.attendees.forEach((a,i)=>{
+      const col=i%aCols,row=Math.floor(i/aCols);
+      const ax=ML+col*aColW,ay=y+row*7.5;
+      if(ay>H-40)return;
+      // Initial circle
+      rect(ax,ay-4.5,6,6,PRI_LT);
+      tc(...PRI);bf('bold',6.5);
+      doc.text((a[0]||'?').toUpperCase(),ax+3,ay-0.2,{align:'center'});
+      tc(...TXT);bf('normal',9);
+      doc.text(a.slice(0,28),ax+9,ay);
+    });
+    y+=Math.ceil(m.attendees.length/aCols)*7.5+8;
+  }
+
+  // Cover page footer
+  rect(0,H-13,W,13,PRI_XL);
+  hline(H-13,0,W,0.3,BRD);
+  tc(...TXT3);bf('normal',7);
+  doc.text(m.company||'',ML,H-7.5);
+  tc(...TXT2);bf('normal',7);
+  doc.text('CONFIDENTIAL  —  For Internal Use Only',W/2,H-7.5,{align:'center'});
+  tc(...TXT3);doc.text('Page 1',W-MR,H-7.5,{align:'right'});
+  tc(...TXT3);bf('normal',6.5);
+  if(m.date)doc.text('Meeting: '+fmtDate(m.date),ML,H-3.5);
+  doc.text('Generated '+new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),W-MR,H-3.5,{align:'right'});
+
+  // ════════════════════════════════════════════
+  //  CONTENT PAGES
+  // ════════════════════════════════════════════
   y=newPage();
 
+  // ─── SECTION 1: AGENDA ───
   if((m.agenda||[]).length){
-    secHead('Meeting Agenda',AMBER,AMB_L,AMB_B);
+    y=secHead('01','Meeting Agenda',y);
+
+    // Table header row
+    rect(ML,y,CW,8,PRI);
+    tc(...WH);bf('bold',7);doc.setCharSpace(0.7);
+    doc.text('#',ML+4,y+5.5,{align:'center'});
+    doc.text('AGENDA ITEM',ML+12,y+5.5);
+    doc.text('DURATION',W-MR,y+5.5,{align:'right'});
+    doc.setCharSpace(0);
+    y+=9;
+
+    let totMins=0;
     m.agenda.forEach((a,i)=>{
-      chk(13);if(i%2===0){fc(SURF2);doc.roundedRect(ml,y,cw,12,1.5,1.5,'F');dc(BORDER);doc.setLineWidth(0.25);doc.roundedRect(ml,y,cw,12,1.5,1.5,'S');}
-      fc(AMB_L);doc.roundedRect(ml+2.5,y+2,7,8,1,1,'F');dc(AMB_B);doc.setLineWidth(0.4);doc.roundedRect(ml+2.5,y+2,7,8,1,1,'S');
-      tc(AMBER);doc.setFont('helvetica','bold');doc.setFontSize(7);doc.text(String(i+1),ml+6,y+7.5,{align:'center'});
-      tc(TEXT);doc.setFont('helvetica','normal');doc.setFontSize(9.5);doc.text(doc.splitTextToSize(a.topic||'—',cw-35)[0],ml+13,y+7.5);
-      if(a.mins){const ds=a.mins+' min',dw=doc.getStringUnitWidth(ds)*7/doc.internal.scaleFactor+12;fc(AMB_L);doc.roundedRect(W-mr-dw,y+2,dw,8,1,1,'F');dc(AMB_B);doc.setLineWidth(0.3);doc.roundedRect(W-mr-dw,y+2,dw,8,1,1,'S');tc(AMBER);doc.setFont('helvetica','bold');doc.setFontSize(7.5);doc.text(ds,W-mr-dw/2,y+7.5,{align:'center'});}
-      y+=14;
-    });
-    const tot=(m.agenda||[]).reduce((s,a)=>s+(+a.mins||0),0);chk(12);
-    fc(AMB_L);doc.roundedRect(ml,y,cw,10,1.5,1.5,'F');dc(AMB_B);doc.setLineWidth(0.4);doc.roundedRect(ml,y,cw,10,1.5,1.5,'S');
-    tc(AMBER);doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.text('Total Duration',ml+5,y+7);doc.text(tot+' minutes',W-mr-4,y+7,{align:'right'});y+=16;
-  }
-
-  if((m.keyPoints||[]).filter(p=>p.trim()).length){
-    chk(30);secHead('Key Discussion Points',BLUE,BLU_L,BLU_B);
-    m.keyPoints.filter(p=>p.trim()).forEach((p,i)=>{
-      const lines=doc.splitTextToSize(p,cw-16),rh=lines.length*5.5+8;chk(rh+3);
-      if(i%2===0){fc(SURF2);doc.roundedRect(ml,y,cw,rh,1.5,1.5,'F');dc(BORDER);doc.setLineWidth(0.25);doc.roundedRect(ml,y,cw,rh,1.5,1.5,'S');}
-      fc(BLUE);doc.circle(ml+6,y+rh/2,1.5,'F');tc(TEXT);doc.setFont('helvetica','normal');doc.setFontSize(9.5);lines.forEach((l,li)=>doc.text(l,ml+12,y+7+li*5.5));y+=rh+3;
-    });y+=5;
-  }
-
-  if(m.notes&&m.notes.trim()){
-    chk(30);secHead('Additional Notes',BLUE,SURF2,BORDER);
-    const lines=doc.splitTextToSize(m.notes,cw-12),bh=lines.length*5.6+10;chk(bh);
-    fc(SURF2);doc.roundedRect(ml,y,cw,bh,2,2,'F');dc(BORDER);doc.setLineWidth(0.25);doc.roundedRect(ml,y,cw,bh,2,2,'S');fc(BLUE);doc.rect(ml,y+4,2,bh-8,'F');
-    let ly=y+8;lines.forEach(l=>{chk(7);tc(TEXT2);doc.setFont('helvetica','normal');doc.setFontSize(9.5);doc.text(l,ml+8,ly);ly+=5.6;});y=ly+8;
-  }
-
-  if((m.actionItems||[]).length){
-    chk(40);secHead('Action Items',GREEN,GRN_L,GRN_B);
-    fc(SURF3);doc.rect(ml,y,cw,9,'F');dc(BORDER);doc.setLineWidth(0.25);doc.rect(ml,y,cw,9,'S');
-    [{x:ml+10,l:'Action Item'},{x:ml+84,l:'Owner'},{x:ml+111,l:'Priority'},{x:ml+133,l:'Due Date'},{x:ml+157,l:'Status'}].forEach(c=>{tc(TEXT3);doc.setFont('helvetica','bold');doc.setFontSize(6.5);doc.setCharSpace(0.8);doc.text(c.l,c.x,y+6);});doc.setCharSpace(0);y+=11;
-    m.actionItems.forEach((a,i)=>{
-      const lines=doc.splitTextToSize(a.task||'',70),rh=Math.max(lines.length*5.2+6,12);chk(rh+1);
-      if(i%2===0){fc(SURF2);doc.rect(ml,y,cw,rh,'F');}dc(BORDER);doc.setLineWidth(0.2);doc.rect(ml,y,cw,rh,'S');
-      dc(a.status==='Done'?GREEN:BORDER2);doc.setLineWidth(0.5);doc.roundedRect(ml+2,y+(rh-6)/2,6,6,0.8,0.8,'S');
-      if(a.status==='Done'){fc(GREEN);doc.roundedRect(ml+2,y+(rh-6)/2,6,6,0.8,0.8,'F');tc(WHITE);doc.setFont('helvetica','bold');doc.setFontSize(6);doc.text('✓',ml+5,y+(rh-6)/2+4.5,{align:'center'});}
-      tc(a.status==='Done'?TEXT3:TEXT);doc.setFont('helvetica','normal');doc.setFontSize(9);lines.forEach((l,li)=>doc.text(l,ml+12,y+7+li*5.2));
-      tc(BLUE);doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.text(a.owner||'—',ml+84,y+7);
-      const pc=a.priority==='High'?RED:a.priority==='Low'?GREEN:AMBER,pcb=a.priority==='High'?RED_L:a.priority==='Low'?GRN_L:AMB_L,pcbr=a.priority==='High'?RED_B:a.priority==='Low'?GRN_B:AMB_B;
-      fc(pcb);doc.roundedRect(ml+111,y+(rh-7)/2,18,7,1,1,'F');dc(pcbr);doc.setLineWidth(0.3);doc.roundedRect(ml+111,y+(rh-7)/2,18,7,1,1,'S');tc(pc);doc.setFontSize(6.5);doc.setFont('helvetica','bold');doc.setCharSpace(0.4);doc.text((a.priority||'Med').slice(0,3).toUpperCase(),ml+120,y+(rh-7)/2+5,{align:'center'});doc.setCharSpace(0);
-      // Due date (formatted)
-      tc(TEXT2);doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.text(fmtDate(a.timeline),ml+133,y+7);
-      const sc=a.status==='Done'?GREEN:a.status==='In Progress'?BLUE:AMBER,scb=a.status==='Done'?GRN_L:a.status==='In Progress'?BLU_L:AMB_L,scbr=a.status==='Done'?GRN_B:a.status==='In Progress'?BLU_B:AMB_B,slbl=a.status==='In Progress'?'IN PROG':a.status==='Done'?'DONE':'OPEN';
-      fc(scb);doc.roundedRect(ml+157,y+(rh-7)/2,20,7,1,1,'F');dc(scbr);doc.setLineWidth(0.3);doc.roundedRect(ml+157,y+(rh-7)/2,20,7,1,1,'S');tc(sc);doc.setFontSize(6);doc.setFont('helvetica','bold');doc.setCharSpace(0.3);doc.text(slbl,ml+167,y+(rh-7)/2+5,{align:'center'});doc.setCharSpace(0);
+      const rh=9;
+      y=chk(rh+1,y);
+      // Alt row
+      rect(ML,y,CW,rh,i%2===0?WH:BG_ROW);
+      // Left accent micro-bar
+      rect(ML,y,1.5,rh,i%2===0?PRI_LT:BRD);
+      hline(y+rh,ML,W-MR,0.2,RULE);
+      // Number
+      tc(...TXT3);bf('bold',8);
+      doc.text(String(i+1).padStart(2,'0'),ML+5.5,y+6,{align:'center'});
+      // Topic
+      tc(...TXT);bf('normal',9.5);
+      const tl=wrap(a.topic||'—',CW-40);
+      doc.text(tl[0],ML+12,y+6);
+      // Duration pill
+      if(a.mins){
+        totMins+=+a.mins;
+        tc(...PRI);bf('bold',8.5);
+        doc.text(a.mins+' min',W-MR,y+6,{align:'right'});
+      }
       y+=rh;
     });
-    chk(14);y+=5;
-    const done=(m.actionItems||[]).filter(a=>a.status==='Done').length,open2=(m.actionItems||[]).length-done;
-    fc(GRN_L);doc.roundedRect(ml,y,cw,10,1.5,1.5,'F');dc(GRN_B);doc.setLineWidth(0.3);doc.roundedRect(ml,y,cw,10,1.5,1.5,'S');
-    tc(GREEN);doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.text(done+' completed',ml+5,y+7);
-    tc(AMBER);doc.text('  ·  '+open2+' open',ml+34,y+7);
-    tc(TEXT3);doc.setFont('helvetica','normal');doc.text('of '+(m.actionItems||[]).length+' total',W-mr,y+7,{align:'right'});
+
+    // Total bar
+    y+=1;y=chk(10,y);
+    rect(ML,y,CW,9,PRI_LT);
+    rect(ML,y,CW,1,PRI_MD);
+    tc(...PRI);bf('bold',8.5);
+    doc.text('TOTAL MEETING DURATION',ML+6,y+6.5);
+    tc(...PRI_MD);bf('bold',9.5);
+    doc.text(totMins+' minutes',W-MR,y+6.5,{align:'right'});
+    y+=15;
   }
 
-  doc.save(((m.company?m.company+'-':'')+( m.title||'meeting')).replace(/[^a-z0-9]+/gi,'-').toLowerCase()+'.pdf');
+  // ─── SECTION 2: DISCUSSION POINTS ───
+  const kps=(m.keyPoints||[]).filter(p=>p.trim());
+  if(kps.length){
+    y=chk(20,y);
+    y=secHead('02','Key Discussion Points',y);
+
+    kps.forEach((p,i)=>{
+      const lines=wrap(p,CW-18);
+      const rh=lines.length*5.6+9;
+      y=chk(rh+2,y);
+      rect(ML,y,CW,rh,i%2===0?WH:BG_ROW);
+      rect(ML,y,1.5,rh,i%2===0?PRI_LT:BRD);
+      hline(y+rh,ML,W-MR,0.2,RULE);
+      // Number bubble
+      rect(ML+4,y+2,6,6,PRI_LT);
+      tc(...PRI);bf('bold',7.5);doc.text(String(i+1),ML+7,y+6.5,{align:'center'});
+      // Text
+      tc(...TXT);bf('normal',9.5);
+      lines.forEach((l,li)=>doc.text(l,ML+14,y+7+li*5.6));
+      y+=rh;
+    });
+    y+=8;
+  }
+
+  // ─── SECTION 3: NOTES ───
+  if(m.notes&&m.notes.trim()){
+    y=chk(20,y);
+    const sn=kps.length?'03':'02';
+    y=secHead(sn,'Notes & Decisions',y);
+    const noteLines=wrap(m.notes,CW-10);
+    const bh=noteLines.length*5.6+10;
+    y=chk(bh+4,y);
+    rect(ML,y,CW,bh,PRI_XL);
+    rect(ML,y,3,bh,PRI_MD);
+    dc(...BRD);lw(0.25);doc.rect(ML,y,CW,bh,'S');
+    tc(...TXT);bf('normal',9.5);
+    let ly=y+7;
+    noteLines.forEach(l=>{
+      if(ly+6>y+bh-2)return;
+      doc.text(l,ML+8,ly);ly+=5.6;
+    });
+    y+=bh+10;
+  }
+
+  // ─── SECTION 4: ACTION ITEMS ───
+  if((m.actionItems||[]).length){
+    y=chk(30,y);
+    const hasNotes=m.notes&&m.notes.trim();
+    const hasDp=kps.length>0;
+    const sn=hasNotes?(hasDp?'04':'03'):(hasDp?'03':'02');
+    y=secHead(sn,'Action Items',y);
+
+    // Column layout: total CW=170
+    // #8 | Task 62 | Owner 28 | Priority 22 | Due 26 | Status 24
+    const C=[
+      {k:'num',  x:ML,      w:9,  lbl:'#'},
+      {k:'task', x:ML+9,    w:60, lbl:'ACTION ITEM'},
+      {k:'own',  x:ML+69,   w:30, lbl:'OWNER'},
+      {k:'pri',  x:ML+99,   w:22, lbl:'PRIORITY'},
+      {k:'due',  x:ML+121,  w:26, lbl:'DUE DATE'},
+      {k:'sta',  x:ML+147,  w:W-MR-(ML+147), lbl:'STATUS'},
+    ];
+
+    // Header
+    rect(ML,y,CW,9,PRI);
+    // Inner accent line
+    rect(ML,y,CW,1.5,PRI_MD);
+    C.forEach(col=>{
+      tc(...WH);bf('bold',6.5);doc.setCharSpace(0.6);
+      doc.text(col.lbl,col.k==='num'?col.x+col.w/2:col.x+2,y+6.5,col.k==='num'?{align:'center'}:{});
+    });
+    doc.setCharSpace(0);
+    y+=10;
+
+    m.actionItems.forEach((a,i)=>{
+      const tl=wrap(a.task||'—',C[1].w-3);
+      const rh=Math.max(tl.length*5.2+8,12);
+      y=chk(rh+1,y);
+
+      const even=i%2===0;
+      rect(ML,y,CW,rh,even?WH:BG_ROW);
+      // Left accent
+      rect(ML,y,2,rh,even?PRI_LT:BRD);
+      hline(y+rh,ML,W-MR,0.2,RULE);
+
+      // Column dividers
+      dc(...RULE);lw(0.2);
+      C.slice(2).forEach(col=>doc.line(col.x-1,y,col.x-1,y+rh));
+
+      const mid=y+rh/2+1.5;
+
+      // # number
+      tc(...TXT3);bf('normal',8);
+      doc.text(String(i+1),C[0].x+C[0].w/2,mid,{align:'center'});
+
+      // Task
+      const isDone=a.status==='Done';
+      tc(...(isDone?TXT3:TXT));bf(isDone?'normal':'normal',9);
+      tl.forEach((l,li)=>{
+        if(isDone){
+          // Draw strikethrough
+          doc.text(l,C[1].x+2,y+7+li*5.2);
+          dc(...TXT3);lw(0.3);
+          const tw=doc.getStringUnitWidth(l)*9/doc.internal.scaleFactor;
+          doc.line(C[1].x+2,y+5.5+li*5.2,C[1].x+2+tw,y+5.5+li*5.2);
+        } else {
+          doc.text(l,C[1].x+2,y+7+li*5.2);
+        }
+      });
+
+      // Owner
+      tc(...TXT);bf('bold',8.5);
+      doc.text((a.owner||'—').slice(0,16),C[2].x+2,mid);
+
+      // Priority badge
+      const pTx=a.priority==='High'?R_TXT:a.priority==='Low'?G_TXT:A_TXT;
+      const pBg=a.priority==='High'?R_BG:a.priority==='Low'?G_BG:A_BG;
+      const pBr=a.priority==='High'?R_BR:a.priority==='Low'?G_BR:A_BR;
+      const pLabel=a.priority||'Medium';
+      rect(C[3].x+2,y+rh/2-3,C[3].w-4,6.5,pBg);
+      dc(...pBr);lw(0.25);doc.rect(C[3].x+2,y+rh/2-3,C[3].w-4,6.5,'S');
+      tc(...pTx);bf('bold',7);
+      doc.text(pLabel.toUpperCase().slice(0,3),C[3].x+2+(C[3].w-4)/2,y+rh/2+1.5,{align:'center'});
+
+      // Due date
+      tc(...TXT2);bf('normal',8.5);
+      doc.text(fmtDate(a.timeline),C[4].x+2,mid);
+
+      // Status badge
+      const sTx=a.status==='Done'?G_TXT:a.status==='In Progress'?B_TXT:A_TXT;
+      const sBg=a.status==='Done'?G_BG:a.status==='In Progress'?B_BG:A_BG;
+      const sBr=a.status==='Done'?G_BR:a.status==='In Progress'?B_BR:A_BR;
+      const sLabel=a.status==='In Progress'?'In Progress':a.status||'Open';
+      rect(C[5].x+1,y+rh/2-3,C[5].w-3,6.5,sBg);
+      dc(...sBr);lw(0.25);doc.rect(C[5].x+1,y+rh/2-3,C[5].w-3,6.5,'S');
+      tc(...sTx);bf('bold',6.5);
+      doc.text(sLabel,C[5].x+1+(C[5].w-3)/2,y+rh/2+1.5,{align:'center'});
+
+      y+=rh;
+    });
+
+    // Summary strip
+    y+=2;y=chk(10,y);
+    const dn=(m.actionItems||[]).filter(a=>a.status==='Done').length;
+    const op=(m.actionItems||[]).filter(a=>a.status==='Open').length;
+    const pr=(m.actionItems||[]).filter(a=>a.status==='In Progress').length;
+    rect(ML,y,CW,9,PRI_LT);
+    rect(ML,y,CW,1,PRI_MD);
+    tc(...TXT2);bf('normal',7.5);
+    doc.text(
+      m.actionItems.length+' Total  ·  '+dn+' Completed  ·  '+pr+' In Progress  ·  '+op+' Open',
+      ML+6, y+6.5
+    );
+    y+=15;
+  }
+
+  // ─── SIGNATURE BLOCK ───
+  y=chk(50,y)+4;
+  rect(ML,y,CW,8,PRI_LT);
+  rect(ML,y,3,8,PRI);
+  tc(...ACC);bf('bold',7.5);doc.setCharSpace(1.2);
+  doc.text('SIGN OFF',ML+7,y+5.5);doc.setCharSpace(0);
+  y+=13;
+
+  const sigW=(CW-12)/3;
+  ['Prepared By','Reviewed By','Approved By'].forEach((lbl,i)=>{
+    const sx=ML+i*(sigW+6);
+    rect(sx,y,sigW,22,BG_ROW);
+    dc(...BRD);lw(0.25);doc.rect(sx,y,sigW,22,'S');
+    rect(sx,y,sigW,2.5,PRI_MD);
+    // Signature line
+    hline(y+16,sx+4,sx+sigW-4,0.5,[140,160,175]);
+    tc(...TXT2);bf('normal',7.5);
+    doc.text(lbl,sx+sigW/2,y+12,{align:'center'});
+    tc(...TXT3);bf('normal',6.5);
+    doc.text('Signature & Date',sx+sigW/2,y+20,{align:'center'});
+  });
+
+  doc.save(((m.company?m.company+'-':'')+( m.title||'meeting')).replace(/[^a-z0-9]+/gi,'-').toLowerCase()+'-minutes.pdf');
   showToast('PDF exported successfully');
 }
 
