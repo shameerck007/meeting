@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Minutes — Meeting Notes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#f5f4f0;
+  --surface:#ffffff;
+  --surface2:#f9f8f5;
+  --surface3:#f0efe9;
+  --border:#e2e0d8;
+  --border2:#ccc9be;
+  --accent:#1a56db;
+  --accent-light:#eff4ff;
+  --accent-mid:#3b71eb;
+  --text:#1a1916;
+  --text2:#5a5750;
+  --text3:#9b9890;
+  --green:#1a7a4a;--green-bg:#f0faf4;--green-border:#b6e6ce;
+  --red:#c5291a;--red-bg:#fef2f1;--red-border:#f5b8b2;
+  --amber:#9a5f0a;--amber-bg:#fffbeb;--amber-border:#fcd888;
+  --blue:#1a56db;--blue-bg:#eff4ff;--blue-border:#bed3fb;
+  --radius:10px;--radius-lg:14px;--radius-xl:18px;
+  --shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+  --shadow-md:0 4px 12px rgba(0,0,0,.08),0 2px 4px rgba(0,0,0,.04);
+  --sidebar-w:268px;
+}
+
+html{height:100%;overflow:hidden}
+body{font-family:'Geist',sans-serif;background:var(--bg);color:var(--text);display:flex;height:100vh;overflow:hidden;position:fixed;width:100%}
+
+/* ── Sidebar ── */
+#sidebar{width:var(--sidebar-w);flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;transition:transform .28s cubic-bezier(.4,0,.2,1);z-index:200}
+.sidebar-top{padding:1.25rem 1.1rem .85rem}
+.brand-row{display:flex;align-items:center;gap:9px;margin-bottom:2px}
+.brand-icon{width:30px;height:30px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-family:'Instrument Serif',serif;font-size:15px;color:#fff;flex-shrink:0;box-shadow:0 2px 8px rgba(26,86,219,.3)}
+.brand-name{font-family:'Instrument Serif',serif;font-size:19px;color:var(--text);letter-spacing:-.03em}
+.brand-tagline{font-size:10px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;font-weight:500;padding-left:39px}
+#new-btn{margin:.65rem .9rem;padding:.65rem 1rem;background:var(--accent);color:#fff;border:none;border-radius:9px;font-family:'Geist',sans-serif;font-size:11.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:all .18s;box-shadow:0 2px 8px rgba(26,86,219,.3);min-height:44px}
+#new-btn:hover{background:var(--accent-mid);box-shadow:0 4px 16px rgba(26,86,219,.38);transform:translateY(-1px)}
+.sidebar-label{font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);font-weight:600;padding:.4rem 1.1rem .3rem}
+#meeting-list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 .55rem .55rem}
+#meeting-list::-webkit-scrollbar{width:3px}
+#meeting-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.meeting-item{padding:.65rem .85rem;border-radius:10px;cursor:pointer;margin-bottom:3px;transition:all .14s;border:1px solid transparent;position:relative;min-height:56px}
+.meeting-item:hover{background:var(--surface2);border-color:var(--border)}
+.meeting-item.active{background:var(--accent-light);border-color:var(--blue-border)}
+.meeting-item.active::before{content:'';position:absolute;left:0;top:22%;bottom:22%;width:3px;background:var(--accent);border-radius:0 3px 3px 0}
+.m-title{font-size:12.5px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px}
+.meeting-item.active .m-title{color:var(--accent)}
+.m-meta{font-size:10.5px;color:var(--text3);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.m-badge{font-size:9px;font-weight:600;padding:2px 7px;border-radius:20px;background:var(--green-bg);color:var(--green);border:1px solid var(--green-border)}
+.m-badge.open{background:var(--amber-bg);color:var(--amber);border-color:var(--amber-border)}
+.sidebar-foot{padding:.85rem 1.1rem;border-top:1px solid var(--border);font-size:11px;color:var(--text3);font-family:'Instrument Serif',serif;font-style:italic;text-align:center}
+
+/* ── Main ── */
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg);min-width:0}
+#toolbar{padding:.6rem 1rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.4rem;background:var(--surface);flex-shrink:0;flex-wrap:wrap}
+.toolbar-title{font-family:'Instrument Serif',serif;font-size:14px;color:var(--text2);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-style:italic;min-width:60px}
+.save-indicator{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text3);font-family:'Geist Mono',monospace;white-space:nowrap}
+.save-dot{width:6px;height:6px;border-radius:50%;background:var(--border2)}
+.save-dot.unsaved{background:var(--amber);animation:pulse 1.5s ease-in-out infinite}
+.save-dot.saved{background:var(--green)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.tb-sep{width:1px;height:22px;background:var(--border);flex-shrink:0;margin:0 2px}
+.tb-btn{padding:.42rem .75rem;border:1px solid var(--border);background:var(--surface);border-radius:8px;cursor:pointer;font-family:'Geist',sans-serif;font-size:11px;font-weight:500;color:var(--text2);display:flex;align-items:center;gap:5px;transition:all .14s;white-space:nowrap;box-shadow:var(--shadow);min-height:36px}
+.tb-btn:hover{background:var(--surface2);border-color:var(--border2);color:var(--text)}
+.tb-btn svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.btn-save{background:var(--green-bg);border-color:var(--green-border);color:var(--green)}
+.btn-save:hover{background:#e0f7ed;border-color:var(--green)}
+.btn-pdf{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;box-shadow:0 2px 8px rgba(26,86,219,.25)}
+.btn-pdf:hover{background:var(--accent-mid);border-color:var(--accent-mid);box-shadow:0 4px 14px rgba(26,86,219,.35);transform:translateY(-1px);color:#fff}
+.btn-pdf svg{stroke:#fff}
+.btn-del{color:var(--red);border-color:var(--red-border)}
+.btn-del:hover{background:var(--red-bg);border-color:var(--red)}
+
+/* Hamburger */
+#ham-btn{display:none;align-items:center;justify-content:center;width:36px;height:36px;border:1px solid var(--border);border-radius:8px;background:var(--surface);cursor:pointer;flex-shrink:0;box-shadow:var(--shadow)}
+#ham-btn svg{width:16px;height:16px;stroke:var(--text2);fill:none;stroke-width:2;stroke-linecap:round}
+/* Overlay */
+#sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:190;backdrop-filter:blur(2px)}
+
+#editor-area{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:1.5rem 1.25rem 5rem}
+#editor-area::-webkit-scrollbar{width:5px}
+#editor-area::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+#empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:1.1rem}
+.empty-glyph{width:60px;height:60px;border-radius:16px;background:var(--surface);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:'Instrument Serif',serif;font-size:24px;color:var(--text3);box-shadow:var(--shadow)}
+.empty-h{font-family:'Instrument Serif',serif;font-size:20px;color:var(--text2)}
+.empty-p{font-size:13px;color:var(--text3);text-align:center;max-width:250px;line-height:1.65}
+
+.hdr-block{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-xl);padding:1.5rem 1.4rem 1.2rem;margin-bottom:1rem;box-shadow:var(--shadow)}
+.company-input{font-family:'Geist',sans-serif;font-size:10.5px;font-weight:600;border:none;background:transparent;color:var(--accent);outline:none;width:100%;letter-spacing:.14em;text-transform:uppercase;margin-bottom:.4rem}
+.company-input::placeholder{color:var(--blue-border)}
+.mtg-title-input{font-family:'Instrument Serif',serif;font-size:26px;border:none;background:transparent;color:var(--text);outline:none;width:100%;padding:.15rem 0;border-bottom:2px solid transparent;transition:border-color .2s;margin-bottom:.7rem}
+.mtg-title-input:focus{border-bottom-color:var(--accent)}
+.mtg-title-input::placeholder{color:var(--text3)}
+.meta-bar{display:flex;gap:.5rem;flex-wrap:wrap}
+.meta-chip{display:flex;align-items:center;gap:5px;padding:.32rem .75rem;border-radius:20px;background:var(--surface2);border:1px solid var(--border);font-size:11.5px;color:var(--text2)}
+.meta-chip svg{width:11px;height:11px;stroke:var(--text3);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.meta-chip input{background:transparent;border:none;outline:none;color:var(--text);font-size:11.5px;font-family:'Geist',sans-serif;min-height:28px}
+.meta-chip input::-webkit-calendar-picker-indicator{filter:opacity(.4);cursor:pointer}
+
+.sec-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-xl);padding:1.2rem 1.2rem 1rem;margin-bottom:1rem;transition:border-color .18s;box-shadow:var(--shadow)}
+.sec-card:focus-within{border-color:var(--border2);box-shadow:var(--shadow-md)}
+.sec-head{display:flex;align-items:center;gap:.6rem;margin-bottom:1rem}
+.sec-ico{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.sec-ico svg{width:13px;height:13px;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ico-blue{background:var(--blue-bg)}.ico-blue svg{stroke:var(--blue)}
+.ico-amber{background:var(--amber-bg)}.ico-amber svg{stroke:var(--amber)}
+.ico-teal{background:#f0fdfa}.ico-teal svg{stroke:#0f766e}
+.ico-green{background:var(--green-bg)}.ico-green svg{stroke:var(--green)}
+.ico-indigo{background:#eef2ff}.ico-indigo svg{stroke:#4f46e5}
+.sec-title{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text2)}
+.sec-count{margin-left:auto;font-size:10px;color:var(--text3);font-family:'Geist Mono',monospace;background:var(--surface2);padding:.18rem .55rem;border-radius:20px;border:1px solid var(--border)}
+
+.attendees-wrap{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;min-height:32px}
+.att-tag{display:flex;align-items:center;gap:5px;padding:.28rem .7rem;border-radius:20px;background:var(--blue-bg);border:1px solid var(--blue-border);font-size:11.5px;color:var(--blue);font-weight:500}
+.att-tag button{background:none;border:none;color:var(--blue-border);cursor:pointer;font-size:15px;line-height:1;padding:0;transition:color .14s;min-width:20px;min-height:20px;display:flex;align-items:center;justify-content:center}
+.att-tag button:hover{color:var(--red)}
+.att-input{border:1px dashed var(--border2);border-radius:20px;padding:.28rem .8rem;font-size:11.5px;font-family:'Geist',sans-serif;outline:none;background:transparent;color:var(--text);min-width:130px;transition:all .18s;margin-top:.35rem;min-height:36px}
+.att-input:focus{border-color:var(--accent);border-style:solid;background:var(--accent-light)}
+
+.agenda-row{display:flex;gap:.6rem;align-items:center;padding:.55rem .7rem;border-radius:9px;margin-bottom:.35rem;background:var(--surface2);border:1px solid transparent;transition:all .14s}
+.agenda-row:hover{border-color:var(--border)}
+.ag-num{width:22px;height:22px;border-radius:6px;background:var(--amber-bg);border:1px solid var(--amber-border);display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:700;color:var(--amber);font-family:'Geist Mono',monospace;flex-shrink:0}
+.agenda-row input[type=text]{flex:1;border:none;background:transparent;color:var(--text);font-size:12.5px;font-family:'Geist',sans-serif;outline:none;min-height:36px}
+.agenda-row input[type=text]::placeholder{color:var(--text3)}
+.ag-mins{display:flex;align-items:center;gap:3px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:.22rem .45rem;font-size:10.5px;color:var(--text3)}
+.ag-mins input{width:34px;border:none;background:transparent;color:var(--text2);font-family:'Geist Mono',monospace;font-size:11px;text-align:center;outline:none;min-height:28px}
+.ag-rm{background:none;border:none;color:var(--text3);cursor:pointer;width:32px;height:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;transition:all .14s;flex-shrink:0}
+.ag-rm:hover{background:var(--red-bg);color:var(--red)}
+.ag-rm svg{width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round}
+.add-btn{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:500;color:var(--text3);background:none;border:1px dashed var(--border);border-radius:8px;cursor:pointer;padding:.42rem .85rem;transition:all .14s;margin-top:.3rem;min-height:36px}
+.add-btn:hover{background:var(--surface2);color:var(--accent);border-color:var(--accent)}
+.add-btn svg{width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+
+.kd-row{display:flex;gap:.6rem;align-items:flex-start;padding:.55rem .7rem;border-radius:9px;margin-bottom:.35rem;background:var(--surface2);border:1px solid transparent;transition:border-color .14s}
+.kd-row:hover{border-color:var(--border)}
+.kd-bullet{width:7px;height:7px;border-radius:50%;background:var(--accent);flex-shrink:0;margin-top:7px}
+.kd-row textarea{flex:1;border:none;background:transparent;color:var(--text);font-size:12.5px;font-family:'Geist',sans-serif;outline:none;resize:none;line-height:1.6;min-height:24px;overflow:hidden}
+.kd-row textarea::placeholder{color:var(--text3)}
+.kd-rm{background:none;border:none;color:var(--text3);cursor:pointer;width:28px;height:28px;border-radius:5px;display:flex;align-items:center;justify-content:center;transition:all .14s;flex-shrink:0;margin-top:4px}
+.kd-rm:hover{background:var(--red-bg);color:var(--red)}
+.kd-rm svg{width:10px;height:10px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round}
+
+.notes-ta{width:100%;min-height:100px;border:none;background:transparent;color:var(--text);font-family:'Geist',sans-serif;font-size:13px;line-height:1.75;resize:vertical;outline:none}
+.notes-ta::placeholder{color:var(--text3)}
+
+/* ── Action Items Table (scrollable on mobile) ── */
+.action-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface)}
+.action-table{width:100%;border-collapse:collapse;font-size:12px;min-width:560px}
+.action-table th{text-align:left;font-size:9.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);padding:.6rem .85rem;background:var(--surface2);border-bottom:1px solid var(--border)}
+.action-table td{padding:.6rem .85rem;border-bottom:1px solid var(--border);vertical-align:middle}
+.action-table tr:last-child td{border-bottom:none}
+.action-table tbody tr:hover td{background:var(--surface2)}
+.at-cb{width:15px;height:15px;accent-color:var(--accent);cursor:pointer}
+.at-task{color:var(--text);font-size:12.5px;line-height:1.5}
+.at-task.done{text-decoration:line-through;color:var(--text3)}
+.at-owner{font-size:11.5px;color:var(--blue);font-family:'Geist Mono',monospace}
+.priority-badge{display:inline-flex;align-items:center;justify-content:center;padding:.22rem .65rem;border-radius:20px;font-size:9.5px;font-weight:600}
+.p-high{background:var(--red-bg);color:var(--red);border:1px solid var(--red-border)}
+.p-med{background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-border)}
+.p-low{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border)}
+.status-badge{display:inline-flex;align-items:center;justify-content:center;padding:.22rem .65rem;border-radius:20px;font-size:9.5px;font-weight:600}
+.s-open{background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-border)}
+.s-done{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border)}
+.s-prog{background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-border)}
+.at-rm{background:none;border:none;color:var(--text3);cursor:pointer;padding:.15rem;border-radius:4px;display:flex;transition:all .14s;min-width:24px;min-height:24px;align-items:center;justify-content:center}
+.at-rm:hover{background:var(--red-bg);color:var(--red)}
+.at-rm svg{width:10px;height:10px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round}
+
+/* ── Add action row ── */
+.add-action-row{display:flex;gap:.5rem;margin-top:.75rem;align-items:center;flex-wrap:wrap}
+.add-action-row input,.add-action-row select{border:1px solid var(--border);border-radius:8px;padding:.44rem .75rem;font-family:'Geist',sans-serif;font-size:11.5px;background:var(--surface);color:var(--text);outline:none;transition:border-color .18s;box-shadow:var(--shadow);min-height:40px;appearance:auto}
+.add-action-row input:focus,.add-action-row select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(26,86,219,.1)}
+.add-action-row input::placeholder{color:var(--text3)}
+.btn-add-action{padding:.44rem .9rem;background:var(--accent);border:1px solid var(--accent);border-radius:8px;color:#fff;font-size:11.5px;font-weight:600;cursor:pointer;font-family:'Geist',sans-serif;transition:all .14s;white-space:nowrap;box-shadow:0 1px 4px rgba(26,86,219,.25);min-height:40px}
+.btn-add-action:hover{background:var(--accent-mid);box-shadow:0 3px 10px rgba(26,86,219,.3)}
+
+/* Owner combo: input + datalist */
+.owner-wrap{position:relative;display:flex;align-items:center}
+#ai-owner{width:120px}
+/* Timeline date */
+#ai-timeline{width:135px;cursor:pointer}
+#ai-timeline::-webkit-calendar-picker-indicator{cursor:pointer;opacity:.6}
+
+#toast{position:fixed;bottom:1.5rem;right:1.5rem;padding:.65rem 1.15rem;border-radius:10px;font-size:12px;font-weight:500;opacity:0;pointer-events:none;transition:all .25s;display:flex;align-items:center;gap:.5rem;z-index:9999;transform:translateY(8px);box-shadow:var(--shadow-md)}
+#toast.show{opacity:1;transform:translateY(0)}
+#toast.success{background:#1a7a4a;color:#fff}
+#toast.info{background:var(--accent);color:#fff}
+#toast svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+
+/* ── Mobile Responsive ── */
+@media(max-width:768px){
+  html,body{position:fixed;overflow:hidden}
+  #ham-btn{display:flex}
+  #sidebar{
+    position:fixed;top:0;left:0;height:100%;
+    transform:translateX(-100%);
+    box-shadow:var(--shadow-md);
+  }
+  #sidebar.open{transform:translateX(0)}
+  #sidebar-overlay.open{display:block}
+  #main{width:100%}
+  #toolbar{padding:.5rem .75rem;gap:.3rem}
+  .toolbar-title{font-size:13px}
+  .tb-sep{display:none}
+  /* hide text labels on small, show icons only for some buttons */
+  .tb-lbl{display:none}
+  .tb-btn{padding:.42rem .6rem;min-height:38px}
+  #editor-area{padding:1rem .85rem 6rem}
+  .hdr-block{padding:1.1rem 1rem .9rem;border-radius:14px}
+  .mtg-title-input{font-size:21px}
+  .sec-card{padding:1rem .9rem .85rem;border-radius:14px}
+  .add-action-row{gap:.4rem}
+  .add-action-row input,.add-action-row select{font-size:13px;min-height:44px}
+  .btn-add-action{min-height:44px;width:100%}
+  #ai-task{width:100%!important;flex:unset}
+  #ai-owner{width:100%!important}
+  #ai-timeline{width:100%!important}
+  #ai-priority,#ai-status{flex:1}
+  .action-table{min-width:500px;font-size:11.5px}
+  #toast{left:1rem;right:1rem;bottom:1.2rem;font-size:13px}
+  .meta-bar{gap:.4rem}
+  .meta-chip input{font-size:12px}
+}
+
+@media(max-width:480px){
+  .brand-name{font-size:17px}
+  .mtg-title-input{font-size:19px}
+  #editor-area{padding:.85rem .65rem 6rem}
+  .hdr-block,.sec-card{border-radius:12px}
+}
+</style>
+</head>
+<body>
+
+<!-- Mobile sidebar overlay -->
+<div id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+<div id="sidebar">
+  <div class="sidebar-top">
+    <div class="brand-row">
+      <div class="brand-icon">M</div>
+      <span class="brand-name">Minutes</span>
+    </div>
+    <div class="brand-tagline">Meeting Notes</div>
+  </div>
+  <button id="new-btn" onclick="newMeeting()">
+    <svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:none;stroke:#fff;stroke-width:3;stroke-linecap:round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    New Meeting
+  </button>
+  <div class="sidebar-label">Recent Meetings</div>
+  <div id="meeting-list"></div>
+  <div class="sidebar-foot">Record · Reflect · Act</div>
+</div>
+
+<div id="main">
+  <div id="toolbar">
+    <!-- Hamburger (mobile only) -->
+    <button id="ham-btn" onclick="toggleSidebar()" aria-label="Toggle menu">
+      <svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <span class="toolbar-title" id="toolbar-title">Select a meeting</span>
+    <div class="save-indicator"><div class="save-dot" id="save-dot"></div><span id="save-lbl">—</span></div>
+    <button class="tb-btn btn-save" onclick="saveMeeting()">
+      <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg><span class="tb-lbl">Save</span>
+    </button>
+    <button class="tb-btn" onclick="duplicateMeeting()">
+      <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span class="tb-lbl">Duplicate</span>
+    </button>
+    <button class="tb-btn btn-del" onclick="deleteMeeting()">
+      <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg><span class="tb-lbl">Delete</span>
+    </button>
+    <button class="tb-btn btn-pdf" onclick="exportPDF()">
+      <svg viewBox="0 0 24 24" style="stroke:#fff"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 18 15 15"/></svg><span class="tb-lbl">Export PDF</span>
+    </button>
+  </div>
+  <div id="editor-area">
+    <div id="empty-state">
+      <div class="empty-glyph">✦</div>
+      <div class="empty-h">No meeting selected</div>
+      <div class="empty-p">Create a new meeting or choose one from the sidebar to begin.</div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"><svg id="t-icon" viewBox="0 0 24 24"></svg><span id="t-msg"></span></div>
+
+<script>
+let meetings=JSON.parse(localStorage.getItem('minutes_v5')||'[]');
+let currentId=null,unsaved=false;
+const save=()=>localStorage.setItem('minutes_v5',JSON.stringify(meetings));
+const getMtg=()=>meetings.find(m=>m.id===currentId);
+const esc=s=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+/* ── Sidebar toggle (mobile) ── */
+function toggleSidebar(){
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebar-overlay').classList.toggle('open');
+}
+function closeSidebar(){
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('open');
+}
+
+function showToast(msg,type='success'){
+  const t=document.getElementById('toast');
+  document.getElementById('t-msg').textContent=msg;
+  document.getElementById('t-icon').innerHTML=type==='success'?'<polyline points="20 6 9 17 4 12"/>':'<circle cx="12" cy="12" r="10"/>';
+  t.className='show '+type;
+  clearTimeout(t._t);t._t=setTimeout(()=>t.className='',2600);
+}
+function markUnsaved(){unsaved=true;const d=document.getElementById('save-dot'),l=document.getElementById('save-lbl');if(d)d.className='save-dot unsaved';if(l)l.textContent='Unsaved';}
+function markSaved(){unsaved=false;const d=document.getElementById('save-dot'),l=document.getElementById('save-lbl');if(d)d.className='save-dot saved';if(l)l.textContent='Saved';}
+
+function renderList(){
+  const el=document.getElementById('meeting-list');
+  if(!meetings.length){el.innerHTML='<div style="padding:.6rem .85rem;font-size:11px;color:var(--text3);font-style:italic">No meetings yet</div>';return;}
+  el.innerHTML=meetings.slice().reverse().map(m=>{
+    const open=(m.actionItems||[]).filter(a=>a.status!=='Done').length;
+    return `<div class="meeting-item${m.id===currentId?' active':''}" onclick="selectMeeting('${m.id}')">
+      <div class="m-title">${esc(m.title)||'Untitled'}</div>
+      <div class="m-meta">${m.company?'<span>'+esc(m.company)+'</span> · ':''}<span>${m.date||'No date'}</span><span class="m-badge${open>0?' open':''}">${open>0?open+' open':'✓ Done'}</span></div>
+    </div>`;
+  }).join('');
+}
+
+function newMeeting(){
+  const id='mtg_'+Date.now();
+  meetings.push({id,company:'',title:'New Meeting',date:new Date().toISOString().slice(0,10),time:'09:00',location:'',attendees:[],agenda:[{topic:'Opening',mins:10}],keyPoints:[],notes:'',actionItems:[]});
+  save();currentId=id;renderList();renderEditor();closeSidebar();
+}
+function selectMeeting(id){
+  if(unsaved&&currentId&&!confirm('Unsaved changes — leave without saving?'))return;
+  currentId=id;unsaved=false;renderList();renderEditor();closeSidebar();
+}
+function saveMeeting(){if(!currentId)return;save();markSaved();showToast('Meeting saved');renderList();}
+function deleteMeeting(){
+  const m=getMtg();if(!m)return;
+  if(!confirm('Delete "'+( m.title||'this meeting')+'"?'))return;
+  meetings=meetings.filter(x=>x.id!==currentId);
+  currentId=meetings.length?meetings[meetings.length-1].id:null;
+  save();unsaved=false;renderList();renderEditor();showToast('Deleted','info');
+}
+function duplicateMeeting(){
+  const m=getMtg();if(!m)return;
+  const c={...JSON.parse(JSON.stringify(m)),id:'mtg_'+Date.now(),title:m.title+' (Copy)'};
+  meetings.push(c);save();currentId=c.id;renderList();renderEditor();showToast('Duplicated');
+}
+
+/* ── Owner datalist from participants ── */
+function buildOwnerDatalist(attendees){
+  return `<datalist id="owners-list">${(attendees||[]).map(a=>`<option value="${esc(a)}">`).join('')}</datalist>`;
+}
+
+/* ── Format date for display ── */
+function fmtDate(d){
+  if(!d)return'—';
+  try{const dt=new Date(d+'T00:00:00');return dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}catch{return d;}
+}
+
+function renderEditor(){
+  const el=document.getElementById('editor-area');
+  const ttl=document.getElementById('toolbar-title');
+  const m=getMtg();
+  if(!m){
+    el.innerHTML='<div id="empty-state"><div class="empty-glyph">✦</div><div class="empty-h">No meeting selected</div><div class="empty-p">Create a new meeting or choose one from the sidebar to begin.</div></div>';
+    if(ttl)ttl.textContent='Select a meeting';
+    document.getElementById('save-dot').className='save-dot';
+    document.getElementById('save-lbl').textContent='—';
+    return;
+  }
+  if(ttl)ttl.textContent=(m.company?m.company+' — ':'')+( m.title||'Untitled');
+  markSaved();
+  el.innerHTML=`
+    <div class="hdr-block">
+      <input class="company-input" value="${esc(m.company)}" placeholder="Company Name" oninput="updateField('company',this.value)">
+      <input class="mtg-title-input" value="${esc(m.title)}" placeholder="Meeting Title" oninput="updateField('title',this.value)">
+      <div class="meta-bar">
+        <div class="meta-chip"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><input type="date" value="${m.date}" oninput="updateField('date',this.value)"></div>
+        <div class="meta-chip"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><input type="time" value="${m.time||'09:00'}" oninput="updateField('time',this.value)"></div>
+        <div class="meta-chip" style="flex:1;min-width:150px"><svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg><input type="text" value="${esc(m.location)}" placeholder="Location or meeting link" oninput="updateField('location',this.value)" style="width:100%"></div>
+      </div>
+    </div>
+
+    <div class="sec-card">
+      <div class="sec-head">
+        <div class="sec-ico ico-blue"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+        <div class="sec-title">Participants</div>
+        <span class="sec-count" id="cnt-att">${(m.attendees||[]).length} people</span>
+      </div>
+      <div class="attendees-wrap" id="att-tags">${renderAttendees(m)}</div>
+      <input class="att-input" placeholder="Type a name and press Enter…" onkeydown="addAttendee(event)" id="att-inp">
+    </div>
+
+    <div class="sec-card">
+      <div class="sec-head">
+        <div class="sec-ico ico-amber"><svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div>
+        <div class="sec-title">Meeting Agenda</div>
+        <span class="sec-count" id="cnt-ag">${(m.agenda||[]).reduce((s,a)=>s+(+a.mins||0),0)} min</span>
+      </div>
+      <div id="agenda-list">${renderAgenda(m)}</div>
+      <button class="add-btn" onclick="addAgendaItem()"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add agenda item</button>
+    </div>
+
+    <div class="sec-card">
+      <div class="sec-head">
+        <div class="sec-ico ico-teal"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+        <div class="sec-title">Key Discussion Points</div>
+      </div>
+      <div id="kd-list">${renderKeyPoints(m)}</div>
+      <button class="add-btn" onclick="addKeyPoint()"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add discussion point</button>
+    </div>
+
+    <div class="sec-card">
+      <div class="sec-head">
+        <div class="sec-ico ico-indigo"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
+        <div class="sec-title">Additional Notes</div>
+      </div>
+      <textarea class="notes-ta" placeholder="Decisions made, context, follow-ups…" oninput="updateField('notes',this.value)">${esc(m.notes)}</textarea>
+    </div>
+
+    <div class="sec-card">
+      <div class="sec-head">
+        <div class="sec-ico ico-green"><svg viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
+        <div class="sec-title">Action Items</div>
+        <span class="sec-count" id="cnt-ai">${(m.actionItems||[]).filter(a=>a.status!=='Done').length} open · ${(m.actionItems||[]).length} total</span>
+      </div>
+      <div class="action-table-wrap">
+        <table class="action-table">
+          <thead><tr><th style="width:32px"></th><th>Action Item</th><th>Owner</th><th>Priority</th><th>Due Date</th><th>Status</th><th style="width:32px"></th></tr></thead>
+          <tbody id="actions-tbody">${renderActions(m)}</tbody>
+        </table>
+      </div>
+      ${buildOwnerDatalist(m.attendees)}
+      <div class="add-action-row">
+        <input type="text" id="ai-task" placeholder="Action item description…" style="flex:2;min-width:140px">
+        <input type="text" id="ai-owner" list="owners-list" placeholder="Owner" autocomplete="off">
+        <select id="ai-priority"><option value="High">High</option><option value="Medium" selected>Medium</option><option value="Low">Low</option></select>
+        <input type="date" id="ai-timeline" title="Pick a due date">
+        <select id="ai-status"><option value="Open" selected>Open</option><option value="In Progress">In Progress</option><option value="Done">Done</option></select>
+        <button class="btn-add-action" onclick="addAction()">+ Add Item</button>
+      </div>
+      <p style="font-size:10.5px;color:var(--text3);margin-top:.5rem">💡 Owner: choose a participant or type any name &nbsp;·&nbsp; Due Date: tap/click to pick a date</p>
+    </div>
+    <div style="height:2rem"></div>`;
+}
+
+function renderAttendees(m){return(m.attendees||[]).map((a,i)=>`<span class="att-tag">${esc(a)}<button onclick="removeAttendee(${i})">×</button></span>`).join('');}
+
+function addAttendee(e){
+  if(e.key!=='Enter')return;const v=e.target.value.trim();if(!v)return;
+  const m=getMtg();m.attendees.push(v);markUnsaved();
+  document.getElementById('att-tags').innerHTML=renderAttendees(m);e.target.value='';updateCounters();
+  // Refresh datalist
+  const dl=document.getElementById('owners-list');if(dl)dl.innerHTML=m.attendees.map(a=>`<option value="${esc(a)}">`).join('');
+}
+function removeAttendee(i){
+  const m=getMtg();m.attendees.splice(i,1);markUnsaved();
+  document.getElementById('att-tags').innerHTML=renderAttendees(m);updateCounters();
+  const dl=document.getElementById('owners-list');if(dl)dl.innerHTML=m.attendees.map(a=>`<option value="${esc(a)}">`).join('');
+}
+
+function renderAgenda(m){
+  return(m.agenda||[]).map((a,i)=>`<div class="agenda-row"><div class="ag-num">${i+1}</div><input type="text" value="${esc(a.topic)}" placeholder="Agenda topic…" oninput="updateAgenda(${i},'topic',this.value)"><div class="ag-mins"><input type="number" value="${a.mins||15}" min="1" oninput="updateAgenda(${i},'mins',+this.value)"><span>min</span></div><button class="ag-rm" onclick="removeAgendaItem(${i})"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>`).join('');
+}
+function addAgendaItem(){const m=getMtg();m.agenda.push({topic:'',mins:15});markUnsaved();document.getElementById('agenda-list').innerHTML=renderAgenda(m);updateCounters();}
+function removeAgendaItem(i){const m=getMtg();m.agenda.splice(i,1);markUnsaved();document.getElementById('agenda-list').innerHTML=renderAgenda(m);updateCounters();}
+function updateAgenda(i,key,val){const m=getMtg();m.agenda[i][key]=val;markUnsaved();updateCounters();}
+
+function renderKeyPoints(m){
+  if(!(m.keyPoints||[]).length)return'<div style="font-size:12.5px;color:var(--text3);padding:.35rem .2rem;font-style:italic">No discussion points yet.</div>';
+  return m.keyPoints.map((p,i)=>`<div class="kd-row"><div class="kd-bullet"></div><textarea rows="1" placeholder="Discussion point…" oninput="updateKeyPoint(${i},this.value);autoResize(this)">${esc(p)}</textarea><button class="kd-rm" onclick="removeKeyPoint(${i})"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>`).join('');
+}
+function addKeyPoint(){const m=getMtg();if(!m.keyPoints)m.keyPoints=[];m.keyPoints.push('');markUnsaved();document.getElementById('kd-list').innerHTML=renderKeyPoints(m);}
+function removeKeyPoint(i){const m=getMtg();m.keyPoints.splice(i,1);markUnsaved();document.getElementById('kd-list').innerHTML=renderKeyPoints(m);}
+function updateKeyPoint(i,val){const m=getMtg();m.keyPoints[i]=val;markUnsaved();}
+function autoResize(ta){ta.style.height='auto';ta.style.height=ta.scrollHeight+'px';}
+
+function priorityClass(p){return p==='High'?'p-high':p==='Medium'?'p-med':'p-low';}
+function statusClass(s){return s==='Done'?'s-done':s==='In Progress'?'s-prog':'s-open';}
+
+function renderActions(m){
+  if(!(m.actionItems||[]).length)return`<tr><td colspan="7" style="font-size:12px;color:var(--text3);font-style:italic;padding:.75rem .85rem">No action items yet — add one below.</td></tr>`;
+  return m.actionItems.map((a,i)=>`<tr>
+    <td><input type="checkbox" class="at-cb" ${a.status==='Done'?'checked':''} onchange="toggleActionDone(${i})"></td>
+    <td><span class="at-task${a.status==='Done'?' done':''}">${esc(a.task)}</span></td>
+    <td><span class="at-owner">${esc(a.owner)||'—'}</span></td>
+    <td><span class="priority-badge ${priorityClass(a.priority)}">${esc(a.priority||'Medium')}</span></td>
+    <td style="font-size:12px;color:var(--text2);white-space:nowrap">${fmtDate(a.timeline)}</td>
+    <td><span class="status-badge ${statusClass(a.status)}">${esc(a.status||'Open')}</span></td>
+    <td><button class="at-rm" onclick="removeAction(${i})"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></td>
+  </tr>`).join('');
+}
+
+function addAction(){
+  const task=document.getElementById('ai-task').value.trim();if(!task)return;
+  const owner=document.getElementById('ai-owner').value.trim();
+  const priority=document.getElementById('ai-priority').value;
+  const timeline=document.getElementById('ai-timeline').value; // ISO date string YYYY-MM-DD
+  const status=document.getElementById('ai-status').value;
+  const m=getMtg();m.actionItems.push({task,owner,priority,timeline,status});markUnsaved();
+  document.getElementById('actions-tbody').innerHTML=renderActions(m);
+  document.getElementById('ai-task').value='';
+  document.getElementById('ai-owner').value='';
+  document.getElementById('ai-timeline').value='';
+  document.getElementById('ai-priority').value='Medium';
+  document.getElementById('ai-status').value='Open';
+  updateCounters();
+}
+function toggleActionDone(i){const m=getMtg();m.actionItems[i].status=m.actionItems[i].status==='Done'?'Open':'Done';markUnsaved();document.getElementById('actions-tbody').innerHTML=renderActions(m);updateCounters();}
+function removeAction(i){const m=getMtg();m.actionItems.splice(i,1);markUnsaved();document.getElementById('actions-tbody').innerHTML=renderActions(m);updateCounters();}
+
+function updateField(key,val){
+  const m=getMtg();if(!m)return;m[key]=val;markUnsaved();
+  if(key==='title'||key==='company'){const t=document.getElementById('toolbar-title');if(t)t.textContent=(m.company?m.company+' — ':'')+( m.title||'Untitled');renderList();}
+}
+function updateCounters(){
+  const m=getMtg();if(!m)return;
+  const a=document.getElementById('cnt-att');if(a)a.textContent=(m.attendees||[]).length+' people';
+  const b=document.getElementById('cnt-ag');if(b)b.textContent=(m.agenda||[]).reduce((s,x)=>s+(+x.mins||0),0)+' min';
+  const c=document.getElementById('cnt-ai');if(c)c.textContent=(m.actionItems||[]).filter(a=>a.status!=='Done').length+' open · '+(m.actionItems||[]).length+' total';
+}
+
+function exportPDF(){
+  const m=getMtg();if(!m){showToast('No meeting selected','info');return;}
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({unit:'mm',format:'a4'});
+  const W=210,H=297,ml=20,mr=20,cw=W-ml-mr;
+  const WHITE=[255,255,255],SURF2=[249,248,245],SURF3=[240,239,233],BORDER=[226,224,216],BORDER2=[204,201,190];
+  const BLUE=[26,86,219],BLU_L=[239,244,255],BLU_B=[190,211,251];
+  const GREEN=[26,122,74],GRN_L=[240,250,244],GRN_B=[182,230,206];
+  const AMBER=[154,95,10],AMB_L=[255,251,235],AMB_B=[252,216,136];
+  const RED=[197,41,26],RED_L=[254,242,241],RED_B=[245,184,178];
+  const TEXT=[26,25,22],TEXT2=[90,87,80],TEXT3=[155,152,144];
+  const fc=rgb=>doc.setFillColor(...rgb);
+  const tc=rgb=>doc.setTextColor(...rgb);
+  const dc=rgb=>doc.setDrawColor(...rgb);
+  let y=0;
+
+  fc(WHITE);doc.rect(0,0,W,H,'F');
+  fc(BLUE);doc.rect(0,0,W,3,'F');
+  fc(SURF3);doc.rect(0,0,W,70,'F');
+  fc(BORDER);doc.rect(0,70,W,0.4,'F');
+  fc(BLUE);doc.roundedRect(ml,14,10,10,2,2,'F');
+  tc(WHITE);doc.setFont('helvetica','bold');doc.setFontSize(8);doc.text('M',ml+5,21.5,{align:'center'});
+  tc(BLUE);doc.setFontSize(11);doc.text('Minutes',ml+14,21.5);
+  y=38;
+  if(m.company){tc(BLUE);doc.setFont('helvetica','bold');doc.setFontSize(7.5);doc.setCharSpace(2.5);doc.text(m.company.toUpperCase(),ml,y);doc.setCharSpace(0);y+=8;}
+  tc(TEXT);doc.setFont('helvetica','bold');doc.setFontSize(22);
+  doc.splitTextToSize(m.title||'Meeting Notes',cw).slice(0,2).forEach(l=>{doc.text(l,ml,y);y+=9.5;});
+  const meta=[];if(m.date)meta.push(m.date);if(m.time)meta.push(m.time);if(m.location)meta.push(m.location);
+  if(meta.length){tc(TEXT3);doc.setFont('helvetica','normal');doc.setFontSize(9);doc.text(meta.join('  ·  '),ml,y+2);}
+  y=80;
+  const stats=[{v:(m.attendees||[]).length,l:'Participants',c:BLUE,cb:BLU_L,cbr:BLU_B},{v:(m.agenda||[]).length,l:'Agenda Items',c:AMBER,cb:AMB_L,cbr:AMB_B},{v:(m.actionItems||[]).length,l:'Action Items',c:GREEN,cb:GRN_L,cbr:GRN_B},{v:(m.actionItems||[]).filter(a=>a.status!=='Done').length,l:'Open Actions',c:RED,cb:RED_L,cbr:RED_B}];
+  const sw=(cw-9)/4;
+  stats.forEach((s,i)=>{const sx=ml+i*(sw+3);fc(s.cb);doc.roundedRect(sx,y,sw,20,2,2,'F');dc(s.cbr);doc.setLineWidth(0.4);doc.roundedRect(sx,y,sw,20,2,2,'S');fc(s.c);doc.rect(sx,y,sw,1.5,'F');tc(s.c);doc.setFont('helvetica','bold');doc.setFontSize(16);doc.text(String(s.v),sx+sw/2,y+14,{align:'center'});tc(TEXT3);doc.setFont('helvetica','normal');doc.setFontSize(6.5);doc.text(s.l,sx+sw/2,y+19,{align:'center'});});
+  y+=28;
+  if((m.attendees||[]).length){
+    tc(TEXT3);doc.setFont('helvetica','bold');doc.setFontSize(7);doc.setCharSpace(1.8);doc.text('PARTICIPANTS',ml,y);doc.setCharSpace(0);y+=7;
+    m.attendees.forEach((a,i)=>{const col=i%3,row=Math.floor(i/3),ax=ml+col*(cw/3),ay=y+row*7;fc(BLU_L);doc.circle(ax+2,ay-2.5,2,'F');tc(BLUE);doc.setFont('helvetica','bold');doc.setFontSize(6.5);doc.text((a[0]||'').toUpperCase(),ax+2,ay-0.5,{align:'center'});tc(TEXT);doc.setFont('helvetica','normal');doc.setFontSize(9.5);doc.text(a,ax+7,ay);});
+    y+=Math.ceil(m.attendees.length/3)*7+8;
+  }
+  fc(SURF3);doc.rect(0,H-14,W,14,'F');fc(BORDER);doc.rect(0,H-14,W,0.3,'F');
+  tc(TEXT3);doc.setFontSize(7.5);doc.setFont('helvetica','normal');doc.text('Generated '+new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}),W/2,H-5,{align:'center'});
+
+  function newPage(){
+    doc.addPage();fc(WHITE);doc.rect(0,0,W,H,'F');fc(BLUE);doc.rect(0,0,W,1.5,'F');fc(SURF3);doc.rect(0,0,W,11,'F');fc(BORDER);doc.rect(0,11,W,0.3,'F');
+    tc(TEXT3);doc.setFont('helvetica','bold');doc.setFontSize(6);doc.setCharSpace(1.5);doc.text(((m.company?m.company+' · ':'')+( m.title||'')).toUpperCase().slice(0,55),ml,7.5);doc.setCharSpace(0);
+    tc(TEXT3);doc.setFont('helvetica','normal');doc.setFontSize(6.5);doc.text(String(doc.internal.getCurrentPageInfo().pageNumber),W-mr,7.5,{align:'right'});
+    fc(SURF3);doc.rect(0,H-10,W,10,'F');fc(BORDER);doc.rect(0,H-10,W,0.3,'F');tc(TEXT3);doc.setFontSize(7);doc.text(m.date||'',W/2,H-3.5,{align:'center'});
+    return 18;
+  }
+  function secHead(title,color,light,lborder){
+    if(y>H-50)y=newPage();y+=6;
+    fc(light);doc.roundedRect(ml,y,cw,11,2,2,'F');dc(lborder);doc.setLineWidth(0.3);doc.roundedRect(ml,y,cw,11,2,2,'S');
+    fc(color);doc.roundedRect(ml,y,3,11,1,1,'F');
+    tc(color);doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setCharSpace(1.5);doc.text(title.toUpperCase(),ml+8,y+7.5);doc.setCharSpace(0);y+=17;
+  }
+  function chk(need){if(y+need>H-16)y=newPage();}
+  y=newPage();
+
+  if((m.agenda||[]).length){
+    secHead('Meeting Agenda',AMBER,AMB_L,AMB_B);
+    m.agenda.forEach((a,i)=>{
+      chk(13);if(i%2===0){fc(SURF2);doc.roundedRect(ml,y,cw,12,1.5,1.5,'F');dc(BORDER);doc.setLineWidth(0.25);doc.roundedRect(ml,y,cw,12,1.5,1.5,'S');}
+      fc(AMB_L);doc.roundedRect(ml+2.5,y+2,7,8,1,1,'F');dc(AMB_B);doc.setLineWidth(0.4);doc.roundedRect(ml+2.5,y+2,7,8,1,1,'S');
+      tc(AMBER);doc.setFont('helvetica','bold');doc.setFontSize(7);doc.text(String(i+1),ml+6,y+7.5,{align:'center'});
+      tc(TEXT);doc.setFont('helvetica','normal');doc.setFontSize(9.5);doc.text(doc.splitTextToSize(a.topic||'—',cw-35)[0],ml+13,y+7.5);
+      if(a.mins){const ds=a.mins+' min',dw=doc.getStringUnitWidth(ds)*7/doc.internal.scaleFactor+12;fc(AMB_L);doc.roundedRect(W-mr-dw,y+2,dw,8,1,1,'F');dc(AMB_B);doc.setLineWidth(0.3);doc.roundedRect(W-mr-dw,y+2,dw,8,1,1,'S');tc(AMBER);doc.setFont('helvetica','bold');doc.setFontSize(7.5);doc.text(ds,W-mr-dw/2,y+7.5,{align:'center'});}
+      y+=14;
+    });
+    const tot=(m.agenda||[]).reduce((s,a)=>s+(+a.mins||0),0);chk(12);
+    fc(AMB_L);doc.roundedRect(ml,y,cw,10,1.5,1.5,'F');dc(AMB_B);doc.setLineWidth(0.4);doc.roundedRect(ml,y,cw,10,1.5,1.5,'S');
+    tc(AMBER);doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.text('Total Duration',ml+5,y+7);doc.text(tot+' minutes',W-mr-4,y+7,{align:'right'});y+=16;
+  }
+
+  if((m.keyPoints||[]).filter(p=>p.trim()).length){
+    chk(30);secHead('Key Discussion Points',BLUE,BLU_L,BLU_B);
+    m.keyPoints.filter(p=>p.trim()).forEach((p,i)=>{
+      const lines=doc.splitTextToSize(p,cw-16),rh=lines.length*5.5+8;chk(rh+3);
+      if(i%2===0){fc(SURF2);doc.roundedRect(ml,y,cw,rh,1.5,1.5,'F');dc(BORDER);doc.setLineWidth(0.25);doc.roundedRect(ml,y,cw,rh,1.5,1.5,'S');}
+      fc(BLUE);doc.circle(ml+6,y+rh/2,1.5,'F');tc(TEXT);doc.setFont('helvetica','normal');doc.setFontSize(9.5);lines.forEach((l,li)=>doc.text(l,ml+12,y+7+li*5.5));y+=rh+3;
+    });y+=5;
+  }
+
+  if(m.notes&&m.notes.trim()){
+    chk(30);secHead('Additional Notes',BLUE,SURF2,BORDER);
+    const lines=doc.splitTextToSize(m.notes,cw-12),bh=lines.length*5.6+10;chk(bh);
+    fc(SURF2);doc.roundedRect(ml,y,cw,bh,2,2,'F');dc(BORDER);doc.setLineWidth(0.25);doc.roundedRect(ml,y,cw,bh,2,2,'S');fc(BLUE);doc.rect(ml,y+4,2,bh-8,'F');
+    let ly=y+8;lines.forEach(l=>{chk(7);tc(TEXT2);doc.setFont('helvetica','normal');doc.setFontSize(9.5);doc.text(l,ml+8,ly);ly+=5.6;});y=ly+8;
+  }
+
+  if((m.actionItems||[]).length){
+    chk(40);secHead('Action Items',GREEN,GRN_L,GRN_B);
+    fc(SURF3);doc.rect(ml,y,cw,9,'F');dc(BORDER);doc.setLineWidth(0.25);doc.rect(ml,y,cw,9,'S');
+    [{x:ml+10,l:'Action Item'},{x:ml+84,l:'Owner'},{x:ml+111,l:'Priority'},{x:ml+133,l:'Due Date'},{x:ml+157,l:'Status'}].forEach(c=>{tc(TEXT3);doc.setFont('helvetica','bold');doc.setFontSize(6.5);doc.setCharSpace(0.8);doc.text(c.l,c.x,y+6);});doc.setCharSpace(0);y+=11;
+    m.actionItems.forEach((a,i)=>{
+      const lines=doc.splitTextToSize(a.task||'',70),rh=Math.max(lines.length*5.2+6,12);chk(rh+1);
+      if(i%2===0){fc(SURF2);doc.rect(ml,y,cw,rh,'F');}dc(BORDER);doc.setLineWidth(0.2);doc.rect(ml,y,cw,rh,'S');
+      dc(a.status==='Done'?GREEN:BORDER2);doc.setLineWidth(0.5);doc.roundedRect(ml+2,y+(rh-6)/2,6,6,0.8,0.8,'S');
+      if(a.status==='Done'){fc(GREEN);doc.roundedRect(ml+2,y+(rh-6)/2,6,6,0.8,0.8,'F');tc(WHITE);doc.setFont('helvetica','bold');doc.setFontSize(6);doc.text('✓',ml+5,y+(rh-6)/2+4.5,{align:'center'});}
+      tc(a.status==='Done'?TEXT3:TEXT);doc.setFont('helvetica','normal');doc.setFontSize(9);lines.forEach((l,li)=>doc.text(l,ml+12,y+7+li*5.2));
+      tc(BLUE);doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.text(a.owner||'—',ml+84,y+7);
+      const pc=a.priority==='High'?RED:a.priority==='Low'?GREEN:AMBER,pcb=a.priority==='High'?RED_L:a.priority==='Low'?GRN_L:AMB_L,pcbr=a.priority==='High'?RED_B:a.priority==='Low'?GRN_B:AMB_B;
+      fc(pcb);doc.roundedRect(ml+111,y+(rh-7)/2,18,7,1,1,'F');dc(pcbr);doc.setLineWidth(0.3);doc.roundedRect(ml+111,y+(rh-7)/2,18,7,1,1,'S');tc(pc);doc.setFontSize(6.5);doc.setFont('helvetica','bold');doc.setCharSpace(0.4);doc.text((a.priority||'Med').slice(0,3).toUpperCase(),ml+120,y+(rh-7)/2+5,{align:'center'});doc.setCharSpace(0);
+      // Due date (formatted)
+      tc(TEXT2);doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.text(fmtDate(a.timeline),ml+133,y+7);
+      const sc=a.status==='Done'?GREEN:a.status==='In Progress'?BLUE:AMBER,scb=a.status==='Done'?GRN_L:a.status==='In Progress'?BLU_L:AMB_L,scbr=a.status==='Done'?GRN_B:a.status==='In Progress'?BLU_B:AMB_B,slbl=a.status==='In Progress'?'IN PROG':a.status==='Done'?'DONE':'OPEN';
+      fc(scb);doc.roundedRect(ml+157,y+(rh-7)/2,20,7,1,1,'F');dc(scbr);doc.setLineWidth(0.3);doc.roundedRect(ml+157,y+(rh-7)/2,20,7,1,1,'S');tc(sc);doc.setFontSize(6);doc.setFont('helvetica','bold');doc.setCharSpace(0.3);doc.text(slbl,ml+167,y+(rh-7)/2+5,{align:'center'});doc.setCharSpace(0);
+      y+=rh;
+    });
+    chk(14);y+=5;
+    const done=(m.actionItems||[]).filter(a=>a.status==='Done').length,open2=(m.actionItems||[]).length-done;
+    fc(GRN_L);doc.roundedRect(ml,y,cw,10,1.5,1.5,'F');dc(GRN_B);doc.setLineWidth(0.3);doc.roundedRect(ml,y,cw,10,1.5,1.5,'S');
+    tc(GREEN);doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.text(done+' completed',ml+5,y+7);
+    tc(AMBER);doc.text('  ·  '+open2+' open',ml+34,y+7);
+    tc(TEXT3);doc.setFont('helvetica','normal');doc.text('of '+(m.actionItems||[]).length+' total',W-mr,y+7,{align:'right'});
+  }
+
+  doc.save(((m.company?m.company+'-':'')+( m.title||'meeting')).replace(/[^a-z0-9]+/gi,'-').toLowerCase()+'.pdf');
+  showToast('PDF exported successfully');
+}
+
+if(meetings.length)currentId=meetings[meetings.length-1].id;
+renderList();renderEditor();
+document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();saveMeeting();}});
+</script>
+</body>
+</html>
